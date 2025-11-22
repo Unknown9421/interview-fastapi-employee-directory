@@ -96,6 +96,7 @@ async def sample_employees(test_session: AsyncSession, sample_organization: Orga
     employees = [
         Employee(
             organization_id=sample_organization.id,
+            avatar_url="https://ui-avatars.com/api/?name=John+Doe",
             first_name="John",
             last_name="Doe",
             email="john.doe@test.com",
@@ -105,9 +106,11 @@ async def sample_employees(test_session: AsyncSession, sample_organization: Orga
             company="Main Branch",
             department="Engineering",
             position="Software Engineer",
+            is_deleted=False,
         ),
         Employee(
             organization_id=sample_organization.id,
+            avatar_url="https://ui-avatars.com/api/?name=Jane+Smith",
             first_name="Jane",
             last_name="Smith",
             email="jane.smith@test.com",
@@ -117,9 +120,11 @@ async def sample_employees(test_session: AsyncSession, sample_organization: Orga
             company="West Division",
             department="Marketing",
             position="Marketing Specialist",
+            is_deleted=False,
         ),
         Employee(
             organization_id=sample_organization.id,
+            avatar_url="https://ui-avatars.com/api/?name=Bob+Johnson",
             first_name="Bob",
             last_name="Johnson",
             email="bob.johnson@test.com",
@@ -129,9 +134,11 @@ async def sample_employees(test_session: AsyncSession, sample_organization: Orga
             company="Main Branch",
             department="Engineering",
             position="Senior Developer",
+            is_deleted=False,
         ),
         Employee(
             organization_id=sample_organization.id,
+            avatar_url="https://ui-avatars.com/api/?name=Alice+Williams",
             first_name="Alice",
             last_name="Williams",
             email="alice.williams@test.com",
@@ -141,6 +148,7 @@ async def sample_employees(test_session: AsyncSession, sample_organization: Orga
             company="East Division",
             department="Sales",
             position="Sales Representative",
+            is_deleted=False,
         ),
     ]
 

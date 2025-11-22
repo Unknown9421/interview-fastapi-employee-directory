@@ -17,7 +17,7 @@ ORGANIZATIONS = [
         "name": "TechCorp International",
         "description": "Global technology solutions provider",
         "visible_columns": [
-            "id", "first_name", "last_name", "email", "phone",
+            "id", "avatar_url", "first_name", "last_name", "email", "phone",
             "status", "location", "company", "department", "position"
         ]
     },
@@ -25,7 +25,7 @@ ORGANIZATIONS = [
         "name": "HealthFirst Medical",
         "description": "Healthcare services organization",
         "visible_columns": [
-            "id", "first_name", "last_name", "email",
+            "id", "avatar_url", "first_name", "last_name", "email",
             "status", "department", "position"
         ]  # No phone, location, company
     },
@@ -35,7 +35,7 @@ ORGANIZATIONS = [
         "visible_columns": [
             "id", "first_name", "last_name",
             "status", "department", "position"
-        ]  # Minimal columns
+        ]  # Minimal columns, no avatar
     },
 ]
 
@@ -121,8 +121,12 @@ async def seed_database():
                 first_name = random.choice(FIRST_NAMES)
                 last_name = random.choice(LAST_NAMES)
 
+                # Generate avatar URL (using UI Avatars service as placeholder)
+                avatar_url = f"https://ui-avatars.com/api/?name={first_name}+{last_name}&background=random"
+
                 employee = Employee(
                     organization_id=org.id,
+                    avatar_url=avatar_url,
                     first_name=first_name,
                     last_name=last_name,
                     email=generate_email(first_name, last_name, org_data["name"]),
@@ -135,6 +139,7 @@ async def seed_database():
                     company=random.choice(COMPANIES),
                     department=random.choice(DEPARTMENTS),
                     position=random.choice(POSITIONS),
+                    created_by="system",
                 )
                 session.add(employee)
 

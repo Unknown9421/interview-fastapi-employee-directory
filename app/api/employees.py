@@ -21,11 +21,18 @@ settings = get_settings()
 async def search_employees(
     organization_id: int = Depends(get_organization_id),
     employee_service: EmployeeService = Depends(get_employee_service),
-    status: Optional[EmployeeStatus] = Query(None, description="Filter by employee status"),
+    status: Optional[list[EmployeeStatus]] = Query(
+        None,
+        description="Filter by employee status (can select multiple)"
+    ),
     location: Optional[str] = Query(None, description="Filter by location (partial match)"),
     company: Optional[str] = Query(None, description="Filter by company (partial match)"),
     department: Optional[str] = Query(None, description="Filter by department (partial match)"),
     position: Optional[str] = Query(None, description="Filter by position (partial match)"),
+    include_terminated: bool = Query(
+        False,
+        description="Include terminated employees in results"
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(
         default=settings.DEFAULT_PAGE_SIZE,
@@ -40,6 +47,8 @@ async def search_employees(
     - **Multi-tenancy**: Only returns employees from the specified organization
     - **Dynamic columns**: Response fields are filtered based on organization's configuration
     - **Pagination**: Results are paginated for performance
+    - **Status filter**: Supports multiple status selection (checkboxes)
+    - **Include terminated**: Toggle to show/hide terminated employees
     """
     # Validate organization exists
     is_valid = await employee_service.validate_organization(organization_id)
@@ -54,18 +63,22 @@ async def search_employees(
     if not visible_columns:
         # Default visible columns if no config exists
         visible_columns = [
-            "id", "first_name", "last_name", "email",
+            "id", "avatar_url", "first_name", "last_name", "email", "phone",
             "status", "location", "company", "department", "position"
         ]
+
+    # Convert status enums to values for service
+    status_values = [s.value for s in status] if status else None
 
     # Search employees
     employees, total = await employee_service.search_employees(
         organization_id=organization_id,
-        status=status.value if status else None,
+        status=status_values,
         location=location,
         company=company,
         department=department,
         position=position,
+        include_terminated=include_terminated,
         page=page,
         page_size=page_size,
     )

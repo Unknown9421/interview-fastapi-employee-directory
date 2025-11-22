@@ -1,5 +1,5 @@
 from typing import Optional, Any
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.employee import Employee, EmployeeStatus
@@ -33,11 +33,12 @@ class EmployeeService:
     async def search_employees(
         self,
         organization_id: int,
-        status: Optional[str] = None,
+        status: Optional[list[str]] = None,
         location: Optional[str] = None,
         company: Optional[str] = None,
         department: Optional[str] = None,
         position: Optional[str] = None,
+        include_terminated: bool = False,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[Employee], int]:
@@ -48,14 +49,27 @@ class EmployeeService:
         # Build base query with multi-tenancy filter
         query = select(Employee).where(Employee.organization_id == organization_id)
 
-        # Apply filters
-        if status:
-            try:
-                status_enum = EmployeeStatus(status)
-                query = query.where(Employee.status == status_enum)
-            except ValueError:
-                pass  # Invalid status, ignore filter
+        # Filter out soft-deleted records
+        query = query.where(Employee.is_deleted == False)
 
+        # Handle include_terminated toggle
+        if not include_terminated:
+            # If include_terminated is False, exclude terminated employees
+            query = query.where(Employee.status != EmployeeStatus.TERMINATED)
+
+        # Apply status filter (multiple selection)
+        if status:
+            valid_statuses = []
+            for s in status:
+                try:
+                    valid_statuses.append(EmployeeStatus(s))
+                except ValueError:
+                    pass  # Invalid status, ignore
+
+            if valid_statuses:
+                query = query.where(Employee.status.in_(valid_statuses))
+
+        # Apply text filters
         if location:
             query = query.where(Employee.location.ilike(f"%{location}%"))
 
@@ -89,6 +103,7 @@ class EmployeeService:
         """Filter employee data based on visible columns configuration."""
         all_columns = {
             "id": employee.id,
+            "avatar_url": employee.avatar_url,
             "first_name": employee.first_name,
             "last_name": employee.last_name,
             "email": employee.email,
@@ -98,6 +113,9 @@ class EmployeeService:
             "company": employee.company,
             "department": employee.department,
             "position": employee.position,
+            # Audit fields
+            "created_at": employee.created_at.isoformat() if employee.created_at else None,
+            "updated_at": employee.updated_at.isoformat() if employee.updated_at else None,
         }
 
         # Return only visible columns

@@ -49,7 +49,7 @@ async def test_search_employees_basic(
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test basic employee search."""
+    """Test basic employee search (excludes terminated by default)."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)}
@@ -63,8 +63,29 @@ async def test_search_employees_basic(
     assert "page_size" in data
     assert "total_pages" in data
 
-    assert data["total"] == len(sample_employees)
-    assert len(data["items"]) == len(sample_employees)
+    # By default, terminated employees are excluded (3 out of 4)
+    assert data["total"] == 3
+    assert len(data["items"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_search_employees_include_terminated(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test employee search with include_terminated flag."""
+    response = await client.get(
+        "/api/v1/employees/search",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"include_terminated": "true"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    # Should return all 4 employees including terminated
+    assert data["total"] == 4
+    assert len(data["items"]) == 4
 
 
 @pytest.mark.asyncio
@@ -89,6 +110,27 @@ async def test_search_employees_filter_by_status(
 
 
 @pytest.mark.asyncio
+async def test_search_employees_multiple_status(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test employee search with multiple status selection."""
+    response = await client.get(
+        "/api/v1/employees/search",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"status": ["Active", "Not started"]}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    # Should return Active (2) + Not started (1) = 3 employees
+    assert data["total"] == 3
+    for item in data["items"]:
+        assert item["status"] in ["Active", "Not started"]
+
+
+@pytest.mark.asyncio
 async def test_search_employees_filter_by_department(
     client: AsyncClient,
     sample_organization: Organization,
@@ -103,6 +145,8 @@ async def test_search_employees_filter_by_department(
     assert response.status_code == 200
     data = response.json()
 
+    # 2 engineers, but one is terminated (not shown by default)
+    # John (Active) and Bob (Not started) are in Engineering
     assert data["total"] == 2
     for item in data["items"]:
         assert "Engineering" in item["department"]
@@ -123,7 +167,9 @@ async def test_search_employees_filter_by_location(
     assert response.status_code == 200
     data = response.json()
 
-    assert data["total"] == 2
+    # John (Active) and Alice (Terminated) are in New York
+    # But Alice is terminated and excluded by default
+    assert data["total"] == 1
     for item in data["items"]:
         assert "New York" in item["location"]
 
@@ -144,7 +190,8 @@ async def test_search_employees_pagination(
     assert response.status_code == 200
     data = response.json()
 
-    assert data["total"] == 4
+    # Total is 3 (excluding terminated)
+    assert data["total"] == 3
     assert len(data["items"]) == 2
     assert data["page"] == 1
     assert data["page_size"] == 2
@@ -216,3 +263,27 @@ async def test_rate_limit_headers(
     assert "X-RateLimit-Limit" in response.headers
     assert "X-RateLimit-Remaining" in response.headers
     assert "X-RateLimit-Window" in response.headers
+
+
+@pytest.mark.asyncio
+async def test_search_employees_with_terminated_status_filter(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test searching for terminated employees specifically."""
+    response = await client.get(
+        "/api/v1/employees/search",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={
+            "status": "Terminated",
+            "include_terminated": "true"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    # Should return only the terminated employee
+    assert data["total"] == 1
+    assert data["items"][0]["status"] == "Terminated"
+    assert data["items"][0]["first_name"] == "Alice"

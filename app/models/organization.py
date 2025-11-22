@@ -2,23 +2,25 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import ARRAY
 
+from app.models.base import AuditableModel, TimestampMixin
 from app.database import Base
 
 
-class Organization(Base):
+class Organization(AuditableModel):
+    """Organization model with audit capabilities."""
     __tablename__ = "organizations"
 
-    id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, unique=True)
     description = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, server_default="true")
 
     # Relationships
     employees = relationship("Employee", back_populates="organization", lazy="selectin")
     config = relationship("OrganizationConfig", back_populates="organization", uselist=False, lazy="selectin")
 
 
-class OrganizationConfig(Base):
+class OrganizationConfig(Base, TimestampMixin):
+    """Configuration for organization-specific settings like visible columns."""
     __tablename__ = "organization_configs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -26,8 +28,8 @@ class OrganizationConfig(Base):
 
     # Dynamic columns configuration - list of allowed column names
     visible_columns = Column(ARRAY(String), nullable=False, default=[
-        "id", "first_name", "last_name", "email", "status",
-        "location", "company", "department", "position"
+        "id", "first_name", "last_name", "email", "phone", "status",
+        "location", "company", "department", "position", "avatar_url"
     ])
 
     # Relationship
