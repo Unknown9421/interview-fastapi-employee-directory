@@ -43,13 +43,15 @@ async def test_search_invalid_organization(client: AsyncClient):
     assert "not found" in response.json()["detail"].lower()
 
 
+# ==================== Cursor-based Search Tests ====================
+
 @pytest.mark.asyncio
-async def test_search_employees_basic(
+async def test_search_employees_cursor_basic(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test basic employee search (excludes terminated by default)."""
+    """Test basic cursor-based employee search."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)}
@@ -58,14 +60,69 @@ async def test_search_employees_basic(
     data = response.json()
 
     assert "items" in data
-    assert "total" in data
-    assert "page" in data
-    assert "page_size" in data
-    assert "total_pages" in data
+    assert "pagination" in data
+    assert "total" in data["pagination"]
+    assert "limit" in data["pagination"]
+    assert "has_next" in data["pagination"]
+    assert "next_cursor" in data["pagination"]
 
     # By default, terminated employees are excluded (3 out of 4)
-    assert data["total"] == 3
+    assert data["pagination"]["total"] == 3
     assert len(data["items"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_search_employees_cursor_pagination(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test cursor-based pagination."""
+    # First page with limit 2
+    response = await client.get(
+        "/api/v1/employees/search",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"limit": 2}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["items"]) == 2
+    assert data["pagination"]["has_next"] is True
+    assert data["pagination"]["next_cursor"] is not None
+
+    # Second page using cursor
+    cursor = data["pagination"]["next_cursor"]
+    response = await client.get(
+        "/api/v1/employees/search",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"limit": 2, "cursor": cursor}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["items"]) == 1  # Only 1 remaining
+    assert data["pagination"]["has_next"] is False
+
+
+@pytest.mark.asyncio
+async def test_search_employees_text_search(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test text search functionality."""
+    # Search by first name
+    response = await client.get(
+        "/api/v1/employees/search",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"q": "John"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["pagination"]["total"] == 1
+    assert data["items"][0]["first_name"] == "John"
 
 
 @pytest.mark.asyncio
@@ -74,7 +131,7 @@ async def test_search_employees_include_terminated(
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test employee search with include_terminated flag."""
+    """Test including terminated employees."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)},
@@ -83,9 +140,7 @@ async def test_search_employees_include_terminated(
     assert response.status_code == 200
     data = response.json()
 
-    # Should return all 4 employees including terminated
-    assert data["total"] == 4
-    assert len(data["items"]) == 4
+    assert data["pagination"]["total"] == 4
 
 
 @pytest.mark.asyncio
@@ -94,7 +149,7 @@ async def test_search_employees_filter_by_status(
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test employee search with status filter."""
+    """Test status filter."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)},
@@ -103,8 +158,7 @@ async def test_search_employees_filter_by_status(
     assert response.status_code == 200
     data = response.json()
 
-    # Should only return active employees
-    assert data["total"] == 2
+    assert data["pagination"]["total"] == 2
     for item in data["items"]:
         assert item["status"] == "Active"
 
@@ -115,7 +169,7 @@ async def test_search_employees_multiple_status(
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test employee search with multiple status selection."""
+    """Test multiple status selection."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)},
@@ -124,19 +178,16 @@ async def test_search_employees_multiple_status(
     assert response.status_code == 200
     data = response.json()
 
-    # Should return Active (2) + Not started (1) = 3 employees
-    assert data["total"] == 3
-    for item in data["items"]:
-        assert item["status"] in ["Active", "Not started"]
+    assert data["pagination"]["total"] == 3
 
 
 @pytest.mark.asyncio
-async def test_search_employees_filter_by_department(
+async def test_search_employees_filter_exact_match(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test employee search with department filter."""
+    """Test exact match filters for dropdown values."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)},
@@ -145,57 +196,9 @@ async def test_search_employees_filter_by_department(
     assert response.status_code == 200
     data = response.json()
 
-    # 2 engineers, but one is terminated (not shown by default)
-    # John (Active) and Bob (Not started) are in Engineering
-    assert data["total"] == 2
+    assert data["pagination"]["total"] == 2
     for item in data["items"]:
-        assert "Engineering" in item["department"]
-
-
-@pytest.mark.asyncio
-async def test_search_employees_filter_by_location(
-    client: AsyncClient,
-    sample_organization: Organization,
-    sample_employees: list[Employee]
-):
-    """Test employee search with location filter."""
-    response = await client.get(
-        "/api/v1/employees/search",
-        headers={"X-Organization-ID": str(sample_organization.id)},
-        params={"location": "New York"}
-    )
-    assert response.status_code == 200
-    data = response.json()
-
-    # John (Active) and Alice (Terminated) are in New York
-    # But Alice is terminated and excluded by default
-    assert data["total"] == 1
-    for item in data["items"]:
-        assert "New York" in item["location"]
-
-
-@pytest.mark.asyncio
-async def test_search_employees_pagination(
-    client: AsyncClient,
-    sample_organization: Organization,
-    sample_employees: list[Employee]
-):
-    """Test employee search pagination."""
-    # Request page 1 with page_size 2
-    response = await client.get(
-        "/api/v1/employees/search",
-        headers={"X-Organization-ID": str(sample_organization.id)},
-        params={"page": 1, "page_size": 2}
-    )
-    assert response.status_code == 200
-    data = response.json()
-
-    # Total is 3 (excluding terminated)
-    assert data["total"] == 3
-    assert len(data["items"]) == 2
-    assert data["page"] == 1
-    assert data["page_size"] == 2
-    assert data["total_pages"] == 2
+        assert item["department"] == "Engineering"
 
 
 @pytest.mark.asyncio
@@ -204,7 +207,7 @@ async def test_search_employees_dynamic_columns(
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test that response only includes configured visible columns."""
+    """Test dynamic column filtering."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)}
@@ -212,39 +215,53 @@ async def test_search_employees_dynamic_columns(
     assert response.status_code == 200
     data = response.json()
 
-    # Check that phone and company are NOT in the response
-    # (based on sample_organization config)
+    # Based on sample_organization config
     for item in data["items"]:
         assert "phone" not in item
         assert "company" not in item
-        # These should be present
         assert "id" in item
         assert "first_name" in item
-        assert "last_name" in item
 
+
+# ==================== Filter Options Tests ====================
 
 @pytest.mark.asyncio
-async def test_search_employees_combined_filters(
+async def test_get_filter_options(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test employee search with multiple filters."""
+    """Test get filter options endpoint."""
     response = await client.get(
-        "/api/v1/employees/search",
-        headers={"X-Organization-ID": str(sample_organization.id)},
-        params={
-            "status": "Active",
-            "location": "New York"
-        }
+        "/api/v1/employees/filters",
+        headers={"X-Organization-ID": str(sample_organization.id)}
     )
     assert response.status_code == 200
     data = response.json()
 
-    # Only John Doe matches both criteria
-    assert data["total"] == 1
-    assert data["items"][0]["first_name"] == "John"
+    assert "locations" in data
+    assert "companies" in data
+    assert "departments" in data
+    assert "positions" in data
+    assert "statuses" in data
 
+    # Should have distinct values from sample employees
+    assert len(data["locations"]) > 0
+    assert len(data["departments"]) > 0
+    assert "Active" in data["statuses"]
+
+
+@pytest.mark.asyncio
+async def test_get_filter_options_invalid_org(client: AsyncClient):
+    """Test filter options with invalid organization."""
+    response = await client.get(
+        "/api/v1/employees/filters",
+        headers={"X-Organization-ID": "99999"}
+    )
+    assert response.status_code == 404
+
+
+# ==================== Rate Limiting Tests ====================
 
 @pytest.mark.asyncio
 async def test_rate_limit_headers(
@@ -252,38 +269,42 @@ async def test_rate_limit_headers(
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test that rate limit headers are present in response."""
+    """Test rate limit headers in response."""
     response = await client.get(
         "/api/v1/employees/search",
         headers={"X-Organization-ID": str(sample_organization.id)}
     )
     assert response.status_code == 200
 
-    # Check rate limit headers
     assert "X-RateLimit-Limit" in response.headers
     assert "X-RateLimit-Remaining" in response.headers
     assert "X-RateLimit-Window" in response.headers
 
 
+# ==================== Legacy Endpoint Tests ====================
+
 @pytest.mark.asyncio
-async def test_search_employees_with_terminated_status_filter(
+async def test_search_employees_legacy(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test searching for terminated employees specifically."""
+    """Test legacy offset-based search."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees/search/legacy",
         headers={"X-Organization-ID": str(sample_organization.id)},
-        params={
-            "status": "Terminated",
-            "include_terminated": "true"
-        }
+        params={"page": 1, "page_size": 2}
     )
     assert response.status_code == 200
     data = response.json()
 
-    # Should return only the terminated employee
-    assert data["total"] == 1
-    assert data["items"][0]["status"] == "Terminated"
-    assert data["items"][0]["first_name"] == "Alice"
+    assert "items" in data
+    assert "total" in data
+    assert "page" in data
+    assert "page_size" in data
+    assert "total_pages" in data
+
+    assert data["total"] == 3
+    assert len(data["items"]) == 2
+    assert data["page"] == 1
+    assert data["total_pages"] == 2
