@@ -42,7 +42,9 @@ fi
 
 # Check if migrations exist, if not auto-generate
 MIGRATIONS_DIR="/app/alembic/versions"
-if [ -z "$(ls -A $MIGRATIONS_DIR 2>/dev/null)" ]; then
+MIGRATION_FILES=$(find $MIGRATIONS_DIR -maxdepth 1 -name "*.py" -type f 2>/dev/null | wc -l)
+
+if [ "$MIGRATION_FILES" -eq 0 ]; then
     echo "📝 No migrations found. Auto-generating initial migration..."
     alembic revision --autogenerate -m "initial"
 
@@ -52,6 +54,8 @@ if [ -z "$(ls -A $MIGRATIONS_DIR 2>/dev/null)" ]; then
         echo "❌ Failed to create migration"
         exit 1
     fi
+else
+    echo "📋 Found $MIGRATION_FILES existing migration(s)"
 fi
 
 # Run migrations
