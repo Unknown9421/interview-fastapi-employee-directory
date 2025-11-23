@@ -44,18 +44,30 @@ fi
 MIGRATIONS_DIR="/app/alembic/versions"
 MIGRATION_FILES=$(find $MIGRATIONS_DIR -maxdepth 1 -name "*.py" -type f 2>/dev/null | wc -l)
 
+echo "🔍 Checking migrations directory: $MIGRATIONS_DIR"
+echo "   Found $MIGRATION_FILES .py file(s)"
+
 if [ "$MIGRATION_FILES" -eq 0 ]; then
     echo "📝 No migrations found. Auto-generating initial migration..."
     alembic revision --autogenerate -m "initial"
 
     if [ $? -eq 0 ]; then
         echo "✅ Initial migration created"
+        # Show the created migration file
+        CREATED_FILE=$(find $MIGRATIONS_DIR -maxdepth 1 -name "*.py" -type f | head -1)
+        if [ -n "$CREATED_FILE" ]; then
+            echo "📄 Migration file: $CREATED_FILE"
+            echo "--- Migration content (first 50 lines) ---"
+            head -50 "$CREATED_FILE"
+            echo "--- End of preview ---"
+        fi
     else
         echo "❌ Failed to create migration"
         exit 1
     fi
 else
     echo "📋 Found $MIGRATION_FILES existing migration(s)"
+    ls -la $MIGRATIONS_DIR/*.py
 fi
 
 # Run migrations
