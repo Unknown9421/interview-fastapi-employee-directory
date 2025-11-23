@@ -64,13 +64,11 @@ WORKDIR /app
 # Copy application code (exclude unnecessary files via .dockerignore)
 COPY --chown=appuser:appgroup . .
 
-# Remove unnecessary files
+# Remove unnecessary files (keep tests for container testing)
 RUN rm -rf \
     .git \
     .gitignore \
     .env* \
-    *.md \
-    tests/ \
     docs/ \
     __pycache__ \
     *.pyc \
