@@ -1,16 +1,20 @@
 from app.schemas.employee import (
-    EmployeeBase,
-    EmployeeResponse,
-    EmployeeSearchParams,
-    PaginatedEmployeeResponse,
+    EmployeeStatus,
+    EmployeeCreateDTO,
+    EmployeeResponseDTO,
+    PaginationMetaDTO,
+    PaginatedResponseDTO,
+    FilterOptionsDTO,
 )
 from app.schemas.organization import OrganizationBase, OrganizationResponse
 
 __all__ = [
-    "EmployeeBase",
-    "EmployeeResponse",
-    "EmployeeSearchParams",
-    "PaginatedEmployeeResponse",
+    "EmployeeStatus",
+    "EmployeeCreateDTO",
+    "EmployeeResponseDTO",
+    "PaginationMetaDTO",
+    "PaginatedResponseDTO",
+    "FilterOptionsDTO",
     "OrganizationBase",
     "OrganizationResponse",
 ]
