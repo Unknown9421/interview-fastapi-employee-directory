@@ -26,7 +26,7 @@ docker-compose up --build
 Lenh nay se:
 - Build Docker image cho ung dung
 - Khoi dong PostgreSQL 16 (port 5436)
-- Chay database migrations
+- Auto-generate database migrations tu SQLAlchemy models
 - Seed **10,000 employees** ngau nhien
 - Khoi dong FastAPI server (port 8000)
 

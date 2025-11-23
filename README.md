@@ -71,7 +71,7 @@ Per the assignment constraints, no external rate-limiting libraries (like `slowa
     This will:
     - Build Docker image for the application
     - Start PostgreSQL 16 (port 5436)
-    - Run database migrations
+    - Auto-generate database migrations from SQLAlchemy models
     - Seed **10,000 employees** randomly
     - Start FastAPI server (port 8000)
 
@@ -232,7 +232,7 @@ docker-compose exec app pytest --cov=app --cov-report=term-missing
 │   ├── config.py         # Settings
 │   ├── database.py       # Database connection
 │   └── seed_data.py      # Seed script (10,000 records)
-├── alembic/              # Database migrations
+├── alembic/              # Database migrations (auto-generated on first run)
 │   └── versions/
 ├── scripts/              # Shell scripts
 ├── tests/                # Unit tests

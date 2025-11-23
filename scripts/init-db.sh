@@ -40,6 +40,20 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     exit 1
 fi
 
+# Check if migrations exist, if not auto-generate
+MIGRATIONS_DIR="/app/alembic/versions"
+if [ -z "$(ls -A $MIGRATIONS_DIR 2>/dev/null)" ]; then
+    echo "📝 No migrations found. Auto-generating initial migration..."
+    alembic revision --autogenerate -m "initial"
+
+    if [ $? -eq 0 ]; then
+        echo "✅ Initial migration created"
+    else
+        echo "❌ Failed to create migration"
+        exit 1
+    fi
+fi
+
 # Run migrations
 echo "📦 Running database migrations..."
 alembic upgrade head
