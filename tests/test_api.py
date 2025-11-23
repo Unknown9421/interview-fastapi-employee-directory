@@ -111,17 +111,18 @@ async def test_list_employees_text_search(
     sample_employees: list[Employee]
 ):
     """Test text search functionality."""
-    # Search by first name
+    # Search by unique email (more specific than name to avoid seed data conflicts)
     response = await client.get(
         "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
-        params={"q": "John"}
+        params={"q": "john.doe@test.com"}
     )
     assert response.status_code == 200
     data = response.json()
 
     assert data["pagination"]["total"] == 1
     assert data["items"][0]["first_name"] == "John"
+    assert data["items"][0]["email"] == "john.doe@test.com"
 
 
 @pytest.mark.asyncio
