@@ -45,38 +45,18 @@ class EmployeeResponseDTO(BaseModel):
     updated_at: Optional[datetime] = None
 
 
-# ==================== Search/Filter DTOs ====================
-
-class SearchRequestDTO(BaseModel):
-    """DTO for search request parameters."""
-    # Text search
-    q: Optional[str] = Field(None, description="Search query for name/email")
-
-    # Filters
-    status: Optional[list[EmployeeStatus]] = Field(None, description="Filter by status (multiple)")
-    location: Optional[str] = Field(None, description="Filter by location")
-    company: Optional[str] = Field(None, description="Filter by company")
-    department: Optional[str] = Field(None, description="Filter by department")
-    position: Optional[str] = Field(None, description="Filter by position")
-
-    # Terminated toggle
-    include_terminated: bool = Field(False, description="Include terminated employees")
-
-    # Cursor-based pagination
-    cursor: Optional[int] = Field(None, description="Cursor (last employee ID from previous page)")
-    limit: int = Field(20, ge=1, le=100, description="Number of items per page")
-
+# ==================== Pagination DTOs ====================
 
 class PaginationMetaDTO(BaseModel):
-    """DTO for pagination metadata."""
+    """DTO for pagination metadata with page jumping support."""
     total: int
-    limit: int
-    has_next: bool
-    next_cursor: Optional[int] = None
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class PaginatedResponseDTO(BaseModel):
-    """DTO for paginated response with cursor-based pagination."""
+    """DTO for paginated response with traditional pagination."""
     items: list[dict[str, Any]]
     pagination: PaginationMetaDTO
 
@@ -90,44 +70,3 @@ class FilterOptionsDTO(BaseModel):
     departments: list[str]
     positions: list[str]
     statuses: list[str] = [s.value for s in EmployeeStatus]
-
-
-# ==================== Legacy Support (backward compatibility) ====================
-
-class EmployeeBase(BaseModel):
-    first_name: str
-    last_name: str
-    email: str
-    phone: Optional[str] = None
-    avatar_url: Optional[str] = None
-    status: EmployeeStatus
-    location: Optional[str] = None
-    company: Optional[str] = None
-    department: Optional[str] = None
-    position: Optional[str] = None
-
-
-class EmployeeResponse(EmployeeResponseDTO):
-    """Alias for backward compatibility."""
-    pass
-
-
-class EmployeeSearchParams(BaseModel):
-    """Legacy search params - use SearchRequestDTO instead."""
-    status: Optional[list[EmployeeStatus]] = None
-    location: Optional[str] = None
-    company: Optional[str] = None
-    department: Optional[str] = None
-    position: Optional[str] = None
-    include_terminated: bool = False
-    page: int = 1
-    page_size: int = 20
-
-
-class PaginatedEmployeeResponse(BaseModel):
-    """Legacy paginated response - use PaginatedResponseDTO instead."""
-    items: list[dict[str, Any]]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int

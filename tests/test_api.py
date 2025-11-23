@@ -26,34 +26,34 @@ async def test_health_check(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_search_without_org_header(client: AsyncClient):
-    """Test search endpoint requires organization header."""
-    response = await client.get("/api/v1/employees/search")
+async def test_list_employees_without_org_header(client: AsyncClient):
+    """Test list endpoint requires organization header."""
+    response = await client.get("/api/v1/employees")
     assert response.status_code == 422  # Missing required header
 
 
 @pytest.mark.asyncio
-async def test_search_invalid_organization(client: AsyncClient):
-    """Test search with non-existent organization."""
+async def test_list_employees_invalid_organization(client: AsyncClient):
+    """Test list with non-existent organization."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": "99999"}
     )
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
 
-# ==================== Cursor-based Search Tests ====================
+# ==================== List Employees Tests ====================
 
 @pytest.mark.asyncio
-async def test_search_employees_cursor_basic(
+async def test_list_employees_basic(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test basic cursor-based employee search."""
+    """Test basic employee listing."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)}
     )
     assert response.status_code == 200
@@ -62,9 +62,9 @@ async def test_search_employees_cursor_basic(
     assert "items" in data
     assert "pagination" in data
     assert "total" in data["pagination"]
-    assert "limit" in data["pagination"]
-    assert "has_next" in data["pagination"]
-    assert "next_cursor" in data["pagination"]
+    assert "page" in data["pagination"]
+    assert "page_size" in data["pagination"]
+    assert "total_pages" in data["pagination"]
 
     # By default, terminated employees are excluded (3 out of 4)
     assert data["pagination"]["total"] == 3
@@ -72,41 +72,40 @@ async def test_search_employees_cursor_basic(
 
 
 @pytest.mark.asyncio
-async def test_search_employees_cursor_pagination(
+async def test_list_employees_pagination(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test cursor-based pagination."""
-    # First page with limit 2
+    """Test pagination with page numbers."""
+    # First page with page_size 2
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
-        params={"limit": 2}
+        params={"page": 1, "page_size": 2}
     )
     assert response.status_code == 200
     data = response.json()
 
     assert len(data["items"]) == 2
-    assert data["pagination"]["has_next"] is True
-    assert data["pagination"]["next_cursor"] is not None
+    assert data["pagination"]["page"] == 1
+    assert data["pagination"]["total_pages"] == 2
 
-    # Second page using cursor
-    cursor = data["pagination"]["next_cursor"]
+    # Second page
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
-        params={"limit": 2, "cursor": cursor}
+        params={"page": 2, "page_size": 2}
     )
     assert response.status_code == 200
     data = response.json()
 
     assert len(data["items"]) == 1  # Only 1 remaining
-    assert data["pagination"]["has_next"] is False
+    assert data["pagination"]["page"] == 2
 
 
 @pytest.mark.asyncio
-async def test_search_employees_text_search(
+async def test_list_employees_text_search(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
@@ -114,7 +113,7 @@ async def test_search_employees_text_search(
     """Test text search functionality."""
     # Search by first name
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
         params={"q": "John"}
     )
@@ -126,14 +125,14 @@ async def test_search_employees_text_search(
 
 
 @pytest.mark.asyncio
-async def test_search_employees_include_terminated(
+async def test_list_employees_include_terminated(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
     """Test including terminated employees."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
         params={"include_terminated": "true"}
     )
@@ -144,14 +143,14 @@ async def test_search_employees_include_terminated(
 
 
 @pytest.mark.asyncio
-async def test_search_employees_filter_by_status(
+async def test_list_employees_filter_by_status(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
     """Test status filter."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
         params={"status": "Active"}
     )
@@ -164,14 +163,14 @@ async def test_search_employees_filter_by_status(
 
 
 @pytest.mark.asyncio
-async def test_search_employees_multiple_status(
+async def test_list_employees_multiple_status(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
     """Test multiple status selection."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
         params={"status": ["Active", "Not started"]}
     )
@@ -182,14 +181,14 @@ async def test_search_employees_multiple_status(
 
 
 @pytest.mark.asyncio
-async def test_search_employees_filter_exact_match(
+async def test_list_employees_filter_department(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
-    """Test exact match filters for dropdown values."""
+    """Test department filter."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)},
         params={"department": "Engineering"}
     )
@@ -202,14 +201,56 @@ async def test_search_employees_filter_exact_match(
 
 
 @pytest.mark.asyncio
-async def test_search_employees_dynamic_columns(
+async def test_list_employees_multi_select_department(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test multi-select department filter."""
+    response = await client.get(
+        "/api/v1/employees",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"department": ["Engineering", "Marketing"]}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["pagination"]["total"] == 3
+    departments = [item["department"] for item in data["items"]]
+    for dept in departments:
+        assert dept in ["Engineering", "Marketing"]
+
+
+@pytest.mark.asyncio
+async def test_list_employees_multi_select_location(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test multi-select location filter."""
+    response = await client.get(
+        "/api/v1/employees",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={"location": ["New York, NY", "Los Angeles, CA"]}
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["pagination"]["total"] == 2
+    locations = [item["location"] for item in data["items"]]
+    for loc in locations:
+        assert loc in ["New York, NY", "Los Angeles, CA"]
+
+
+@pytest.mark.asyncio
+async def test_list_employees_dynamic_columns(
     client: AsyncClient,
     sample_organization: Organization,
     sample_employees: list[Employee]
 ):
     """Test dynamic column filtering."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)}
     )
     assert response.status_code == 200
@@ -221,6 +262,30 @@ async def test_search_employees_dynamic_columns(
         assert "company" not in item
         assert "id" in item
         assert "first_name" in item
+
+
+@pytest.mark.asyncio
+async def test_list_employees_combined_filters(
+    client: AsyncClient,
+    sample_organization: Organization,
+    sample_employees: list[Employee]
+):
+    """Test combining multiple filters."""
+    response = await client.get(
+        "/api/v1/employees",
+        headers={"X-Organization-ID": str(sample_organization.id)},
+        params={
+            "status": "Active",
+            "department": "Engineering"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["pagination"]["total"] == 1
+    assert data["items"][0]["first_name"] == "John"
+    assert data["items"][0]["department"] == "Engineering"
+    assert data["items"][0]["status"] == "Active"
 
 
 # ==================== Filter Options Tests ====================
@@ -271,7 +336,7 @@ async def test_rate_limit_headers(
 ):
     """Test rate limit headers in response."""
     response = await client.get(
-        "/api/v1/employees/search",
+        "/api/v1/employees",
         headers={"X-Organization-ID": str(sample_organization.id)}
     )
     assert response.status_code == 200
@@ -279,32 +344,3 @@ async def test_rate_limit_headers(
     assert "X-RateLimit-Limit" in response.headers
     assert "X-RateLimit-Remaining" in response.headers
     assert "X-RateLimit-Window" in response.headers
-
-
-# ==================== Legacy Endpoint Tests ====================
-
-@pytest.mark.asyncio
-async def test_search_employees_legacy(
-    client: AsyncClient,
-    sample_organization: Organization,
-    sample_employees: list[Employee]
-):
-    """Test legacy offset-based search."""
-    response = await client.get(
-        "/api/v1/employees/search/legacy",
-        headers={"X-Organization-ID": str(sample_organization.id)},
-        params={"page": 1, "page_size": 2}
-    )
-    assert response.status_code == 200
-    data = response.json()
-
-    assert "items" in data
-    assert "total" in data
-    assert "page" in data
-    assert "page_size" in data
-    assert "total_pages" in data
-
-    assert data["total"] == 3
-    assert len(data["items"]) == 2
-    assert data["page"] == 1
-    assert data["total_pages"] == 2

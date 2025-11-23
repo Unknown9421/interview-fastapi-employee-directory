@@ -6,7 +6,6 @@ from starlette import status as http_status
 from app.core.dependencies import get_organization_id, get_employee_service
 from app.services.employee_service import EmployeeService
 from app.schemas.employee import (
-    PaginatedEmployeeResponse,
     PaginatedResponseDTO,
     PaginationMetaDTO,
     FilterOptionsDTO,
@@ -57,12 +56,12 @@ async def get_filter_options(
 
 
 @router.get(
-    "/search",
+    "",
     response_model=PaginatedResponseDTO,
-    summary="Search employees (cursor-based)",
-    description="Search employees with cursor-based pagination for optimal performance with large datasets.",
+    summary="List employees",
+    description="Get employees with filters and pagination. Supports multi-select filters and page jumping.",
 )
-async def search_employees_v2(
+async def list_employees(
     organization_id: int = Depends(get_organization_id),
     employee_service: EmployeeService = Depends(get_employee_service),
     q: Optional[str] = Query(None, description="Search query (name, email)"),
@@ -70,103 +69,22 @@ async def search_employees_v2(
         None,
         description="Filter by employee status (can select multiple)"
     ),
-    location: Optional[str] = Query(None, description="Filter by location (exact match)"),
-    company: Optional[str] = Query(None, description="Filter by company (exact match)"),
-    department: Optional[str] = Query(None, description="Filter by department (exact match)"),
-    position: Optional[str] = Query(None, description="Filter by position (exact match)"),
-    include_terminated: bool = Query(
-        False,
-        description="Include terminated employees in results"
-    ),
-    cursor: Optional[int] = Query(None, description="Cursor for pagination (last employee ID)"),
-    limit: int = Query(
-        default=settings.DEFAULT_PAGE_SIZE,
-        ge=1,
-        le=settings.MAX_PAGE_SIZE,
-        description="Number of items per page"
-    ),
-):
-    """
-    Search employees with cursor-based pagination.
-
-    **Benefits of cursor-based pagination:**
-    - Better performance for large datasets (no OFFSET)
-    - Consistent results even with concurrent data changes
-    - Memory efficient
-
-    **How to use:**
-    1. First request: Don't send cursor
-    2. Next page: Send `cursor` = `next_cursor` from previous response
-    3. Continue until `has_next` = false
-    """
-    # Validate organization exists
-    is_valid = await employee_service.validate_organization(organization_id)
-    if not is_valid:
-        raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
-            detail=f"Organization with ID {organization_id} not found or inactive"
-        )
-
-    # Get organization's visible columns configuration
-    visible_columns = await employee_service.get_organization_config(organization_id)
-    if not visible_columns:
-        visible_columns = [
-            "id", "avatar_url", "first_name", "last_name", "email", "phone",
-            "status", "location", "company", "department", "position"
-        ]
-
-    # Convert status enums to values
-    status_values = [s.value for s in status] if status else None
-
-    # Search with cursor-based pagination
-    employees, total, has_next, next_cursor = await employee_service.search_employees_cursor(
-        organization_id=organization_id,
-        q=q,
-        status=status_values,
-        location=location,
-        company=company,
-        department=department,
-        position=position,
-        include_terminated=include_terminated,
-        cursor=cursor,
-        limit=limit,
-    )
-
-    # Filter columns based on organization config
-    filtered_employees = [
-        employee_service.filter_employee_columns(emp, visible_columns)
-        for emp in employees
-    ]
-
-    return PaginatedResponseDTO(
-        items=filtered_employees,
-        pagination=PaginationMetaDTO(
-            total=total,
-            limit=limit,
-            has_next=has_next,
-            next_cursor=next_cursor,
-        )
-    )
-
-
-@router.get(
-    "/search/legacy",
-    response_model=PaginatedEmployeeResponse,
-    summary="Search employees (offset-based)",
-    description="Legacy search with offset pagination. Use /search for better performance.",
-    deprecated=True,
-)
-async def search_employees_legacy(
-    organization_id: int = Depends(get_organization_id),
-    employee_service: EmployeeService = Depends(get_employee_service),
-    status: Optional[list[EmployeeStatus]] = Query(
+    location: Optional[list[str]] = Query(
         None,
-        description="Filter by employee status (can select multiple)"
+        description="Filter by locations (can select multiple)"
     ),
-    location: Optional[str] = Query(None, description="Filter by location (partial match)"),
-    company: Optional[str] = Query(None, description="Filter by company (partial match)"),
-    department: Optional[str] = Query(None, description="Filter by department (partial match)"),
-    position: Optional[str] = Query(None, description="Filter by position (partial match)"),
+    company: Optional[list[str]] = Query(
+        None,
+        description="Filter by companies (can select multiple)"
+    ),
+    department: Optional[list[str]] = Query(
+        None,
+        description="Filter by departments (can select multiple)"
+    ),
+    position: Optional[list[str]] = Query(
+        None,
+        description="Filter by positions (can select multiple)"
+    ),
     include_terminated: bool = Query(
         False,
         description="Include terminated employees in results"
@@ -180,10 +98,18 @@ async def search_employees_legacy(
     ),
 ):
     """
-    Legacy search with offset-based pagination.
+    List employees with filters and pagination.
 
-    **Warning:** This endpoint uses OFFSET which can be slow for large datasets.
-    Use `/search` with cursor-based pagination for better performance.
+    **Features:**
+    - Multi-select filters for location, company, department, position
+    - Text search across name and email
+    - Page jumping support (go to any page directly)
+    - Optimized with Deferred Join for large datasets
+
+    **Example:**
+    ```
+    GET /api/v1/employees?department=Engineering&department=Sales&page=5
+    ```
     """
     # Validate organization exists
     is_valid = await employee_service.validate_organization(organization_id)
@@ -204,14 +130,15 @@ async def search_employees_legacy(
     # Convert status enums to values
     status_values = [s.value for s in status] if status else None
 
-    # Search employees
+    # Search with Deferred Join pagination
     employees, total = await employee_service.search_employees(
         organization_id=organization_id,
+        q=q,
         status=status_values,
-        location=location,
-        company=company,
-        department=department,
-        position=position,
+        locations=location,
+        companies=company,
+        departments=department,
+        positions=position,
         include_terminated=include_terminated,
         page=page,
         page_size=page_size,
@@ -226,10 +153,12 @@ async def search_employees_legacy(
     # Calculate pagination info
     total_pages = math.ceil(total / page_size) if total > 0 else 1
 
-    return PaginatedEmployeeResponse(
+    return PaginatedResponseDTO(
         items=filtered_employees,
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages,
+        pagination=PaginationMetaDTO(
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+        )
     )

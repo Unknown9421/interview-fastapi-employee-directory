@@ -136,34 +136,52 @@ Project bao gồm các helper scripts trong thư mục `scripts/`:
 
 ### Header bắt buộc
 
-Tất cả requests đến `/api/v1/employees/search` cần có header:
+Tất cả requests đến `/api/v1/employees` cần có header:
 ```
 X-Organization-ID: <organization_id>
 ```
 
-### Ví dụ Search API
+### Ví dụ API
 
-**Tìm tất cả employees (không bao gồm terminated):**
+**Lấy danh sách employees (không bao gồm terminated):**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees/search" \
+curl -X GET "http://localhost:8000/api/v1/employees" \
   -H "X-Organization-ID: 1"
 ```
 
-**Tìm với filters:**
+**Lấy với filters:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees/search?status=Active&department=Engineering&page=1&page_size=20" \
+curl -X GET "http://localhost:8000/api/v1/employees?status=Active&department=Engineering&page=1&page_size=20" \
   -H "X-Organization-ID: 1"
 ```
 
 **Bao gồm terminated employees:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees/search?include_terminated=true" \
+curl -X GET "http://localhost:8000/api/v1/employees?include_terminated=true" \
   -H "X-Organization-ID: 1"
 ```
 
 **Multiple status selection:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees/search?status=Active&status=Not%20started" \
+curl -X GET "http://localhost:8000/api/v1/employees?status=Active&status=Not%20started" \
+  -H "X-Organization-ID: 1"
+```
+
+**Multi-select filters (location, department, etc.):**
+```bash
+curl -X GET "http://localhost:8000/api/v1/employees?department=Engineering&department=Marketing&location=New%20York" \
+  -H "X-Organization-ID: 1"
+```
+
+**Nhảy trang (Page jumping):**
+```bash
+curl -X GET "http://localhost:8000/api/v1/employees?page=5&page_size=50" \
+  -H "X-Organization-ID: 1"
+```
+
+**Lấy filter options cho dropdowns:**
+```bash
+curl -X GET "http://localhost:8000/api/v1/employees/filters" \
   -H "X-Organization-ID: 1"
 ```
 
@@ -186,10 +204,12 @@ curl -X GET "http://localhost:8000/api/v1/employees/search?status=Active&status=
       "position": "Software Engineer"
     }
   ],
-  "total": 100,
-  "page": 1,
-  "page_size": 20,
-  "total_pages": 5
+  "pagination": {
+    "total": 10000,
+    "page": 1,
+    "page_size": 50,
+    "total_pages": 200
+  }
 }
 ```
 

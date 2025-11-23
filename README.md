@@ -8,11 +8,13 @@ A high-performance, containerized microservice built with **FastAPI** to provide
 
 ## 🚀 Key Features
 
-* **High-Performance Search API:** Optimized for handling millions of records using database indexing and efficient query planning.
+* **High-Performance API:** Optimized with Deferred Join (Late Row Lookup) pagination for handling millions of records (10x-100x faster for deep pages).
+* **Multi-Select Filters:** Support for selecting multiple values in location, company, department, position filters.
+* **Page Jumping:** Traditional pagination with page numbers - jump to any page directly.
 * **Multi-Tenancy Isolation:** Strict data separation ensures users can only search within their own organization.
-* **Dynamic Column Configuration:** Return fields are dynamically masked based on per-organization settings (e.g., some orgs see "Phone", others don't).
-* **Custom Rate Limiting:** A thread-safe, in-memory rate limiter implementation (Token Bucket/Fixed Window) built purely with the Python standard library (No Redis/Memcached used, per requirements).
-* **Containerized:** Fully Dockerized for easy deployment.
+* **Dynamic Column Configuration:** Return fields are dynamically masked based on per-organization settings.
+* **Custom Rate Limiting:** Thread-safe, in-memory sliding window rate limiter (no Redis/external libs).
+* **Containerized:** Fully Dockerized with optimized multi-stage builds.
 * **OpenAPI Integration:** Auto-generated API documentation via Swagger UI.
 
 ---
@@ -34,10 +36,16 @@ Instead of hardcoding the API response model, the system uses a configuration la
 * **Storage:** Organization configurations (allowed columns) are stored in the database/config file.
 * **Logic:** A middleware/serializer layer intercepts the response and filters out fields that are not in the organization's "allow-list". This ensures that even if the DB query selects all data, the API response remains strict and secure.
 
-### 2. Custom Rate Limiting (No External Libs)
+### 2. Deferred Join Pagination (High Performance)
+Traditional OFFSET pagination is slow for deep pages because it reads and discards N rows.
+* **Implementation:** Split query into 2 steps: (1) Get IDs using index-only scan, (2) JOIN back to fetch full data.
+* **Performance:** 10x-100x faster for pages 1000+ compared to simple OFFSET.
+* **Page Jumping:** Supports jumping to any page directly (unlike cursor-based pagination).
+
+### 3. Custom Rate Limiting (No External Libs)
 Per the assignment constraints, no external rate-limiting libraries (like `slowapi` or Redis) were used.
-* **Implementation:** I implemented a **Sliding Window** (or Token Bucket) algorithm using Python's `collections` and `time` modules.
-* **Concurrency:** Used `threading.Lock` (or `asyncio.Lock`) to ensure thread safety when modifying the in-memory request counters.
+* **Implementation:** I implemented a **Sliding Window** algorithm using Python's `collections` and `time` modules.
+* **Concurrency:** Used `asyncio.Lock` to ensure thread safety when modifying the in-memory request counters.
 * **Cleanup:** A background mechanism periodically cleans up stale entries to prevent memory leaks.
 
 ---
