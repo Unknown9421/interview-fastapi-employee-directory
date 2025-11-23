@@ -25,9 +25,9 @@ docker-compose up --build
 
 Lệnh này sẽ:
 - Build Docker image cho ứng dụng
-- Khởi động PostgreSQL 16
+- Khởi động PostgreSQL 16 (port 5436)
 - Chạy database migrations
-- Seed dữ liệu mẫu
+- Seed **10,000 employees** ngẫu nhiên
 - Khởi động FastAPI server
 
 ### Bước 3: Truy cập API
@@ -75,8 +75,10 @@ cp .env.example .env
 
 Chỉnh sửa `.env` với thông tin database của bạn:
 ```env
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/employee_directory
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5436/employee_directory
 ```
+
+> **Lưu ý**: Port mặc định là 5436 để tránh xung đột với PostgreSQL local.
 
 ### Bước 4: Tạo database
 
@@ -101,6 +103,31 @@ python -m app.seed_data
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+---
+
+## Shell Scripts (Mini CI/CD)
+
+Project bao gồm các helper scripts trong thư mục `scripts/`:
+
+| Script | Mô tả | Sử dụng |
+|--------|-------|---------|
+| `init-db.sh` | Khởi tạo database (migrations + seed) | `./scripts/init-db.sh` |
+| `start.sh` | Khởi động app với auto-initialization | `./scripts/start.sh` |
+| `migrate.sh` | Helper cho migration commands | `./scripts/migrate.sh [command]` |
+| `test.sh` | Chạy tests với coverage | `./scripts/test.sh` |
+| `dev.sh` | Development server với auto-reload | `./scripts/dev.sh` |
+
+### Migration Commands
+
+```bash
+./scripts/migrate.sh create "migration_name"  # Tạo migration mới
+./scripts/migrate.sh upgrade                  # Apply tất cả migrations
+./scripts/migrate.sh downgrade                # Rollback migration cuối
+./scripts/migrate.sh reset                    # Reset database
+./scripts/migrate.sh history                  # Xem lịch sử migrations
+./scripts/migrate.sh current                  # Xem revision hiện tại
 ```
 
 ---
@@ -198,13 +225,19 @@ pytest --cov=app --cov-report=html
 │   ├── core/             # Dependencies
 │   ├── middleware/       # Rate limiter
 │   ├── models/           # SQLAlchemy models
-│   ├── schemas/          # Pydantic schemas
+│   ├── schemas/          # Pydantic schemas (DTOs)
 │   ├── services/         # Business logic
 │   ├── main.py           # FastAPI application
 │   ├── config.py         # Settings
 │   ├── database.py       # Database connection
-│   └── seed_data.py      # Seed script
+│   └── seed_data.py      # Seed script (10,000 records)
 ├── alembic/              # Database migrations
+├── scripts/              # Shell scripts (CI/CD)
+│   ├── init-db.sh        # Database initialization
+│   ├── start.sh          # Application startup
+│   ├── migrate.sh        # Migration helper
+│   ├── test.sh           # Test runner
+│   └── dev.sh            # Development server
 ├── tests/                # Unit tests
 ├── docker-compose.yml
 ├── Dockerfile
@@ -216,15 +249,17 @@ pytest --cov=app --cov-report=html
 
 ## Dữ liệu mẫu
 
-Sau khi seed, hệ thống sẽ có:
+Sau khi seed, hệ thống sẽ có **10,000 employees** phân bố như sau:
 
-| Organization ID | Tên | Visible Columns |
-|----------------|-----|-----------------|
-| 1 | TechCorp International | Tất cả columns |
-| 2 | HealthFirst Medical | Không có phone, location, company |
-| 3 | EduLearn Academy | Chỉ basic info |
+| Organization ID | Tên | Visible Columns | ~Employees |
+|----------------|-----|-----------------|------------|
+| 1 | TechCorp International | Tất cả columns | ~5,000 (50%) |
+| 2 | HealthFirst Medical | Không có phone, location, company | ~3,000 (30%) |
+| 3 | EduLearn Academy | Chỉ basic info | ~2,000 (20%) |
 
-Mỗi organization có 50-150 employees ngẫu nhiên.
+**Distribution:**
+- 70% Active, 20% Not started, 10% Terminated
+- Dữ liệu được insert theo batch (500 records/batch) để tối ưu performance
 
 ---
 

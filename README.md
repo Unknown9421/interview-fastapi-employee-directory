@@ -62,12 +62,37 @@ Per the assignment constraints, no external rate-limiting libraries (like `slowa
     *This will start the FastAPI backend and a PostgreSQL database instance.*
 
 3.  **Seed Dummy Data:**
-    The application will automatically seed initial data (Organizations, Configs, and random Users) on startup if the DB is empty.
+    The application will automatically seed initial data (3 Organizations, Configs, and **10,000 random Employees**) on startup if the DB is empty.
     *(Check logs to confirm seeding is complete).*
 
 4.  **Access the API:**
     * **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
     * **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+---
+
+## 🔧 Shell Scripts (Mini CI/CD)
+
+The project includes helper scripts in the `scripts/` directory:
+
+| Script | Description | Usage |
+|--------|-------------|-------|
+| `init-db.sh` | Initialize database (migrations + seed) | `./scripts/init-db.sh` |
+| `start.sh` | Start app with auto-initialization | `./scripts/start.sh` |
+| `migrate.sh` | Migration helper commands | `./scripts/migrate.sh [command]` |
+| `test.sh` | Run tests with coverage | `./scripts/test.sh` |
+| `dev.sh` | Development server with reload | `./scripts/dev.sh` |
+
+### Migration Commands
+
+```bash
+./scripts/migrate.sh create "migration_name"  # Create new migration
+./scripts/migrate.sh upgrade                  # Apply all migrations
+./scripts/migrate.sh downgrade                # Rollback last migration
+./scripts/migrate.sh reset                    # Reset database
+./scripts/migrate.sh history                  # Show migration history
+./scripts/migrate.sh current                  # Show current revision
+```
 
 ---
 
