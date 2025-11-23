@@ -1,15 +1,22 @@
 """
 Seed data script for initializing the database with sample data.
 Run this script after migrations to populate the database.
+
+Generates 10,000 random employee records distributed across organizations.
 """
 import asyncio
 import random
+import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
 from app.models.organization import Organization, OrganizationConfig
 from app.models.employee import Employee, EmployeeStatus
+
+# Configuration
+TOTAL_EMPLOYEES = 10000
+BATCH_SIZE = 500  # Insert in batches for better performance
 
 # Sample data
 ORGANIZATIONS = [
@@ -80,14 +87,19 @@ POSITIONS = [
 STATUSES = [EmployeeStatus.ACTIVE, EmployeeStatus.NOT_STARTED, EmployeeStatus.TERMINATED]
 
 
-def generate_email(first_name: str, last_name: str, org_name: str) -> str:
-    """Generate email address from name and organization."""
+def generate_email(first_name: str, last_name: str, org_name: str, unique_id: str) -> str:
+    """Generate unique email address from name and organization."""
     domain = org_name.lower().replace(" ", "").replace(".", "")[:10]
-    return f"{first_name.lower()}.{last_name.lower()}@{domain}.com"
+    return f"{first_name.lower()}.{last_name.lower()}.{unique_id}@{domain}.com"
+
+
+def generate_phone() -> str:
+    """Generate random US phone number."""
+    return f"+1-{random.randint(200, 999)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
 
 
 async def seed_database():
-    """Seed the database with sample organizations and employees."""
+    """Seed the database with sample organizations and 10,000 employees."""
     async with AsyncSessionLocal() as session:
         # Check if data already exists
         result = await session.execute(select(Organization).limit(1))
@@ -95,9 +107,11 @@ async def seed_database():
             print("Database already seeded. Skipping...")
             return
 
-        print("Seeding database...")
+        print(f"Seeding database with {TOTAL_EMPLOYEES} employees...")
 
         # Create organizations with configs
+        org_ids = []
+        org_names = []
         for org_data in ORGANIZATIONS:
             # Create organization
             org = Organization(
@@ -115,38 +129,78 @@ async def seed_database():
             )
             session.add(config)
 
-            # Create employees for this organization
-            num_employees = random.randint(50, 150)
-            for _ in range(num_employees):
-                first_name = random.choice(FIRST_NAMES)
-                last_name = random.choice(LAST_NAMES)
-
-                # Generate avatar URL (using UI Avatars service as placeholder)
-                avatar_url = f"https://ui-avatars.com/api/?name={first_name}+{last_name}&background=random"
-
-                employee = Employee(
-                    organization_id=org.id,
-                    avatar_url=avatar_url,
-                    first_name=first_name,
-                    last_name=last_name,
-                    email=generate_email(first_name, last_name, org_data["name"]),
-                    phone=f"+1-{random.randint(200, 999)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}",
-                    status=random.choices(
-                        STATUSES,
-                        weights=[0.7, 0.2, 0.1]  # 70% Active, 20% Not started, 10% Terminated
-                    )[0],
-                    location=random.choice(LOCATIONS),
-                    company=random.choice(COMPANIES),
-                    department=random.choice(DEPARTMENTS),
-                    position=random.choice(POSITIONS),
-                    created_by="system",
-                )
-                session.add(employee)
-
-            print(f"Created organization '{org_data['name']}' with {num_employees} employees")
+            org_ids.append(org.id)
+            org_names.append(org_data["name"])
+            print(f"Created organization '{org_data['name']}' (ID: {org.id})")
 
         await session.commit()
-        print("Database seeding completed successfully!")
+
+        # Generate employees in batches for better performance
+        print(f"Generating {TOTAL_EMPLOYEES} employees in batches of {BATCH_SIZE}...")
+
+        total_created = 0
+        batch_employees = []
+
+        for i in range(TOTAL_EMPLOYEES):
+            # Distribute employees across organizations (weighted distribution)
+            # 50% to first org, 30% to second, 20% to third
+            org_weights = [0.5, 0.3, 0.2]
+            org_index = random.choices(range(len(org_ids)), weights=org_weights)[0]
+            org_id = org_ids[org_index]
+            org_name = org_names[org_index]
+
+            first_name = random.choice(FIRST_NAMES)
+            last_name = random.choice(LAST_NAMES)
+
+            # Generate unique ID for email uniqueness
+            unique_id = str(uuid.uuid4())[:8]
+
+            # Generate avatar URL (using UI Avatars service as placeholder)
+            avatar_url = f"https://ui-avatars.com/api/?name={first_name}+{last_name}&background=random"
+
+            employee = Employee(
+                organization_id=org_id,
+                avatar_url=avatar_url,
+                first_name=first_name,
+                last_name=last_name,
+                email=generate_email(first_name, last_name, org_name, unique_id),
+                phone=generate_phone(),
+                status=random.choices(
+                    STATUSES,
+                    weights=[0.7, 0.2, 0.1]  # 70% Active, 20% Not started, 10% Terminated
+                )[0],
+                location=random.choice(LOCATIONS),
+                company=random.choice(COMPANIES),
+                department=random.choice(DEPARTMENTS),
+                position=random.choice(POSITIONS),
+                created_by="system",
+            )
+            batch_employees.append(employee)
+
+            # Commit in batches
+            if len(batch_employees) >= BATCH_SIZE:
+                session.add_all(batch_employees)
+                await session.commit()
+                total_created += len(batch_employees)
+                print(f"Progress: {total_created}/{TOTAL_EMPLOYEES} employees created ({(total_created/TOTAL_EMPLOYEES*100):.1f}%)")
+                batch_employees = []
+
+        # Commit remaining employees
+        if batch_employees:
+            session.add_all(batch_employees)
+            await session.commit()
+            total_created += len(batch_employees)
+
+        print(f"\n✅ Database seeding completed successfully!")
+        print(f"📊 Total employees created: {total_created}")
+
+        # Print distribution
+        for i, org_name in enumerate(org_names):
+            result = await session.execute(
+                select(Employee).where(Employee.organization_id == org_ids[i])
+            )
+            count = len(result.scalars().all())
+            print(f"   - {org_name}: {count} employees")
 
 
 if __name__ == "__main__":
