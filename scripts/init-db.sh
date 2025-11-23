@@ -6,6 +6,9 @@
 
 set -e
 
+# Force unbuffered output and redirect to stderr for Docker visibility
+exec 1>&2
+
 echo "🚀 Initializing database..."
 
 # Wait for database to be ready
