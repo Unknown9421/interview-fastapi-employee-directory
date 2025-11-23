@@ -1,105 +1,102 @@
-# Hướng dẫn chạy dự án Employee Search Service
+# Huong Dan Chay Du An Employee Search Service
 
-## Yêu cầu hệ thống
+## Yeu Cau He Thong
 
 - Docker & Docker Compose
-- Python 3.10+ (nếu chạy local)
-- PostgreSQL 16+ (nếu chạy local)
+- Python 3.11+ (neu chay local)
+- PostgreSQL 16+ (neu chay local)
 
 ---
 
-## Cách 1: Chạy với Docker (Khuyến nghị)
+## Cach 1: Chay voi Docker (Khuyen nghi)
 
-### Bước 1: Clone repository
+### Buoc 1: Clone repository
 
 ```bash
 git clone https://github.com/Unknown9421/interview-fastapi-employee-directory.git
 cd interview-fastapi-employee-directory
 ```
 
-### Bước 2: Khởi động services
+### Buoc 2: Khoi dong services
 
 ```bash
 docker-compose up --build
 ```
 
-Lệnh này sẽ:
-- Build Docker image cho ứng dụng
-- Khởi động PostgreSQL 16 (port 5436)
-- Chạy database migrations
-- Seed **10,000 employees** ngẫu nhiên
-- Khởi động FastAPI server
+Lenh nay se:
+- Build Docker image cho ung dung
+- Khoi dong PostgreSQL 16 (port 5436)
+- Chay database migrations
+- Seed **10,000 employees** ngau nhien
+- Khoi dong FastAPI server (port 8000)
 
-### Bước 3: Truy cập API
+### Buoc 3: Truy cap API
 
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 - **Health Check**: http://localhost:8000/health
 
-### Dừng services
+### Dung services
 
 ```bash
 docker-compose down
 ```
 
-Để xóa cả database volume:
+De xoa ca database volume:
 ```bash
 docker-compose down -v
 ```
 
 ---
 
-## Cách 2: Chạy Local (Development)
+## Cach 2: Chay Local (Development)
 
-### Bước 1: Tạo virtual environment
+### Buoc 1: Tao virtual environment
 
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# hoặc
+# hoac
 venv\Scripts\activate  # Windows
 ```
 
-### Bước 2: Cài đặt dependencies
+### Buoc 2: Cai dat dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Bước 3: Cấu hình database
+### Buoc 3: Cau hinh database
 
-Tạo file `.env` từ template:
+Tao file `.env` tu template:
 ```bash
 cp .env.example .env
 ```
 
-Chỉnh sửa `.env` với thông tin database của bạn:
+Chinh sua `.env` voi thong tin database:
 ```env
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5436/employee_directory
 ```
 
-> **Lưu ý**: Port mặc định là 5436 để tránh xung đột với PostgreSQL local.
-
-### Bước 4: Tạo database
+### Buoc 4: Tao database
 
 ```bash
-# Kết nối PostgreSQL và tạo database
 psql -U postgres -c "CREATE DATABASE employee_directory;"
 ```
 
-### Bước 5: Chạy migrations
+### Buoc 5: Chay migrations
 
 ```bash
 alembic upgrade head
 ```
 
-### Bước 6: Seed dữ liệu mẫu
+### Buoc 6: Seed du lieu mau
 
 ```bash
 python -m app.seed_data
 ```
 
-### Bước 7: Khởi động server
+### Buoc 7: Khoi dong server
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -107,228 +104,146 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
-## Shell Scripts (Mini CI/CD)
+## Su Dung API
 
-Project bao gồm các helper scripts trong thư mục `scripts/`:
+### Header bat buoc
 
-| Script | Mô tả | Sử dụng |
-|--------|-------|---------|
-| `init-db.sh` | Khởi tạo database (migrations + seed) | `./scripts/init-db.sh` |
-| `start.sh` | Khởi động app với auto-initialization | `./scripts/start.sh` |
-| `migrate.sh` | Helper cho migration commands | `./scripts/migrate.sh [command]` |
-| `test.sh` | Chạy tests với coverage | `./scripts/test.sh` |
-| `dev.sh` | Development server với auto-reload | `./scripts/dev.sh` |
-
-### Migration Commands
-
-```bash
-./scripts/migrate.sh create "migration_name"  # Tạo migration mới
-./scripts/migrate.sh upgrade                  # Apply tất cả migrations
-./scripts/migrate.sh downgrade                # Rollback migration cuối
-./scripts/migrate.sh reset                    # Reset database
-./scripts/migrate.sh history                  # Xem lịch sử migrations
-./scripts/migrate.sh current                  # Xem revision hiện tại
-```
-
----
-
-## Sử dụng API
-
-### Header bắt buộc
-
-Tất cả requests đến `/api/v1/employees` cần có header:
+Tat ca requests den `/api/v1/employees` can co header:
 ```
 X-Organization-ID: <organization_id>
 ```
 
-### Ví dụ API
+### Vi du API
 
-**Lấy danh sách employees (không bao gồm terminated):**
+**Lay danh sach employees:**
 ```bash
 curl -X GET "http://localhost:8000/api/v1/employees" \
   -H "X-Organization-ID: 1"
 ```
 
-**Lấy với filters:**
+**Voi filters:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees?status=Active&department=Engineering&page=1&page_size=20" \
+curl -X GET "http://localhost:8000/api/v1/employees?status=Active&department=Engineering" \
   -H "X-Organization-ID: 1"
 ```
 
-**Bao gồm terminated employees:**
+**Bao gom terminated employees:**
 ```bash
 curl -X GET "http://localhost:8000/api/v1/employees?include_terminated=true" \
   -H "X-Organization-ID: 1"
 ```
 
-**Multiple status selection:**
+**Multi-select filters:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees?status=Active&status=Not%20started" \
+curl -X GET "http://localhost:8000/api/v1/employees?department=Engineering&department=Marketing" \
   -H "X-Organization-ID: 1"
 ```
 
-**Multi-select filters (location, department, etc.):**
+**Tim kiem:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/employees?department=Engineering&department=Marketing&location=New%20York" \
+curl -X GET "http://localhost:8000/api/v1/employees?search=john" \
   -H "X-Organization-ID: 1"
 ```
 
-**Nhảy trang (Page jumping):**
-```bash
-curl -X GET "http://localhost:8000/api/v1/employees?page=5&page_size=50" \
-  -H "X-Organization-ID: 1"
-```
-
-**Lấy filter options cho dropdowns:**
+**Lay filter options:**
 ```bash
 curl -X GET "http://localhost:8000/api/v1/employees/filters" \
   -H "X-Organization-ID: 1"
 ```
 
-### Response mẫu
-
-```json
-{
-  "items": [
-    {
-      "id": 1,
-      "avatar_url": "https://ui-avatars.com/api/?name=John+Doe",
-      "first_name": "John",
-      "last_name": "Doe",
-      "email": "john.doe@techcorp.com",
-      "phone": "+1-555-0101",
-      "status": "Active",
-      "location": "New York, NY",
-      "company": "Main Branch",
-      "department": "Engineering",
-      "position": "Software Engineer"
-    }
-  ],
-  "pagination": {
-    "total": 10000,
-    "page": 1,
-    "page_size": 50,
-    "total_pages": 200
-  }
-}
-```
-
 ---
 
-## Chạy Tests
+## Chay Tests
 
-### Với Docker
+### Voi Docker
 
 ```bash
-docker-compose exec app pytest
+docker-compose exec app pytest -v
 ```
 
 ### Local
 
 ```bash
-pytest
+pytest -v
 ```
 
-### Với coverage report
+### Voi coverage report
 
 ```bash
-pytest --cov=app --cov-report=html
+pytest --cov=app --cov-report=term-missing
 ```
 
 ---
 
-## Cấu trúc dự án
+## Shell Scripts
 
-```
-├── app/
-│   ├── api/              # API endpoints
-│   ├── core/             # Dependencies
-│   ├── middleware/       # Rate limiter
-│   ├── models/           # SQLAlchemy models
-│   ├── schemas/          # Pydantic schemas (DTOs)
-│   ├── services/         # Business logic
-│   ├── main.py           # FastAPI application
-│   ├── config.py         # Settings
-│   ├── database.py       # Database connection
-│   └── seed_data.py      # Seed script (10,000 records)
-├── alembic/              # Database migrations
-├── scripts/              # Shell scripts (CI/CD)
-│   ├── init-db.sh        # Database initialization
-│   ├── start.sh          # Application startup
-│   ├── migrate.sh        # Migration helper
-│   ├── test.sh           # Test runner
-│   └── dev.sh            # Development server
-├── tests/                # Unit tests
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── .env.example
+| Script | Mo ta | Su dung |
+|--------|-------|---------|
+| `init-db.sh` | Khoi tao database | `./scripts/init-db.sh` |
+| `start.sh` | Khoi dong app | `./scripts/start.sh` |
+| `migrate.sh` | Migration commands | `./scripts/migrate.sh [command]` |
+| `test.sh` | Chay tests | `./scripts/test.sh` |
+| `dev.sh` | Development server | `./scripts/dev.sh` |
+
+### Migration Commands
+
+```bash
+./scripts/migrate.sh create "migration_name"  # Tao migration moi
+./scripts/migrate.sh upgrade                  # Apply migrations
+./scripts/migrate.sh downgrade                # Rollback migration
+./scripts/migrate.sh reset                    # Reset database
+./scripts/migrate.sh history                  # Xem lich su
+./scripts/migrate.sh current                  # Xem revision hien tai
 ```
 
 ---
 
-## Dữ liệu mẫu
+## Du Lieu Mau
 
-Sau khi seed, hệ thống sẽ có **10,000 employees** phân bố như sau:
+Sau khi seed, he thong co **10,000 employees**:
 
-| Organization ID | Tên | Visible Columns | ~Employees |
+| Organization ID | Ten | Visible Columns | ~Employees |
 |----------------|-----|-----------------|------------|
-| 1 | TechCorp International | Tất cả columns | ~5,000 (50%) |
-| 2 | HealthFirst Medical | Không có phone, location, company | ~3,000 (30%) |
-| 3 | EduLearn Academy | Chỉ basic info | ~2,000 (20%) |
+| 1 | TechCorp International | Tat ca columns | ~5,000 |
+| 2 | HealthFirst Medical | Khong co phone, location, company | ~3,000 |
+| 3 | EduLearn Academy | Chi basic info | ~2,000 |
 
-**Distribution:**
-- 70% Active, 20% Not started, 10% Terminated
-- Dữ liệu được insert theo batch (500 records/batch) để tối ưu performance
+**Distribution:** 70% Active, 20% Not started, 10% Terminated
 
 ---
 
 ## Rate Limiting
 
-API có rate limiting:
-- **100 requests / 60 giây** (mặc định)
-- Headers trong response:
-  - `X-RateLimit-Limit`: Giới hạn tối đa
-  - `X-RateLimit-Remaining`: Số requests còn lại
-  - `X-RateLimit-Window`: Thời gian window (giây)
+- **100 requests / 60 giay**
+- Response headers:
+  - `X-RateLimit-Limit`: Gioi han toi da
+  - `X-RateLimit-Remaining`: So requests con lai
+  - `X-RateLimit-Window`: Thoi gian window
 
-Khi vượt quá giới hạn, API trả về `429 Too Many Requests`.
+Vuot qua gioi han tra ve `429 Too Many Requests`.
 
 ---
 
 ## Troubleshooting
 
-### Lỗi kết nối database
+### Loi ket noi database
 
 ```
 sqlalchemy.exc.OperationalError: connection refused
 ```
 
-**Giải pháp**: Đảm bảo PostgreSQL đang chạy và DATABASE_URL đúng.
+**Giai phap**: Dam bao PostgreSQL dang chay va DATABASE_URL dung.
 
-### Lỗi migration
+### Loi migration
 
 ```bash
-# Reset migrations
 alembic downgrade base
 alembic upgrade head
 ```
 
-### Xóa toàn bộ data và bắt đầu lại
+### Xoa toan bo data
 
 ```bash
 docker-compose down -v
 docker-compose up --build
 ```
-
----
-
-## PyCharm Configuration
-
-1. Mở project trong PyCharm
-2. Configure Python Interpreter: `Settings > Project > Python Interpreter`
-3. Add Docker Compose interpreter hoặc local venv
-4. Run Configuration:
-   - Script: `uvicorn`
-   - Parameters: `app.main:app --reload`
-   - Working directory: Project root
