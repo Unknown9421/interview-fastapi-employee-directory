@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import os
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -9,8 +10,11 @@ from app.database import Base, get_db
 from app.models.organization import Organization, OrganizationConfig
 from app.models.employee import Employee, EmployeeStatus
 
-# Test database URL (use SQLite for testing)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Test database URL - use PostgreSQL (same as app, supports ARRAY type)
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@db:5432/employee_directory"
+)
 
 
 @pytest.fixture(scope="session")
