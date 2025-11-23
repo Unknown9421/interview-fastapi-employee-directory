@@ -25,31 +25,40 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 async def test_engine():
-    """Create test database engine."""
+    """Create test database engine (session-scoped to avoid recreation)."""
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
     )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
 @pytest.fixture(scope="function")
 async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Create test database session."""
+    """
+    Create test database session with transaction rollback.
+    Each test runs in a transaction that gets rolled back after.
+    This preserves the database state (including seed data).
+    """
     async_session = async_sessionmaker(
         test_engine,
         class_=AsyncSession,
         expire_on_commit=False,
     )
-    async with async_session() as session:
-        yield session
+
+    async with test_engine.connect() as conn:
+        # Start a transaction
+        trans = await conn.begin()
+
+        # Create a session bound to this connection
+        async with async_session(bind=conn) as session:
+            yield session
+
+        # Rollback the transaction (undo all changes)
+        await trans.rollback()
 
 
 @pytest.fixture(scope="function")
