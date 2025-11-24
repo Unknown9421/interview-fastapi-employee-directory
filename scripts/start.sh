@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # ==============================================
 # Application startup script
 # Initializes database and starts the server
