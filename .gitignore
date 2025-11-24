@@ -149,30 +149,3 @@ cdk.out/
 .env
 .env.*
 !.env.example
-
-# PyCharm additional
-*.iml
-*.ipr
-*.iws
-out/
-.idea_modules/
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# ruff
-.ruff_cache/
-
-# Docker
-docker-data/
-postgres-data/
-
-# Local database
-*.db
-*.sqlite
-
-# Extracted/working documents
-docs/
-*.docx
