@@ -144,11 +144,18 @@ class EmployeeRepository(BaseRepository[Employee]):
         Returns:
             Dictionary with keys: locations, companies, departments, positions
         """
-        filter_fields = ["location", "company", "department", "position"]
+        # Mapping of singular field names to plural keys
+        # (handles irregular plurals like "company" -> "companies")
+        field_mapping = {
+            "location": "locations",
+            "company": "companies",  # Irregular plural
+            "department": "departments",
+            "position": "positions",
+        }
 
         options = {}
-        for field in filter_fields:
-            options[f"{field}s"] = await self.get_distinct_values(
+        for field, plural_key in field_mapping.items():
+            options[plural_key] = await self.get_distinct_values(
                 organization_id, field
             )
 
