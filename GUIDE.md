@@ -247,3 +247,124 @@ alembic upgrade head
 docker-compose down -v
 docker-compose up --build
 ```
+
+---
+
+## Repository Pattern
+
+### Kien truc 3-Layer
+
+Du an nay su dung **3-Layer Architecture** voi **Repository Pattern**:
+
+```
+app/
+├── api/              # Presentation Layer - API endpoints
+├── services/         # Service Layer - Business logic
+├── repositories/     # Repository Layer - Database queries
+├── models/           # ORM entities
+└── schemas/          # DTOs (Pydantic)
+```
+
+### Cau truc Repository
+
+```
+app/repositories/
+├── __init__.py                      # Exports
+├── base.py                          # Generic CRUD operations
+├── employee_repository.py           # Employee-specific queries
+└── organization_repository.py       # Organization-specific queries
+```
+
+### Cach su dung Repository
+
+**1. Trong Service Layer:**
+
+```python
+from app.repositories.employee_repository import EmployeeRepository
+from app.repositories.organization_repository import OrganizationRepository
+
+class EmployeeService:
+    def __init__(
+        self,
+        employee_repo: EmployeeRepository,
+        org_repo: OrganizationRepository
+    ):
+        self.employee_repo = employee_repo
+        self.org_repo = org_repo
+
+    async def get_employee(self, employee_id: int):
+        # Goi repository method thay vi viet SQL truc tiep
+        return await self.employee_repo.get_by_id(employee_id)
+
+    async def search_employees(self, org_id: int, filters: dict):
+        # Repository xu ly tat ca SQL logic
+        employees, total = await self.employee_repo.find_by_organization(
+            org_id, filters, page=1, page_size=20
+        )
+        return employees, total
+```
+
+**2. Trong API Endpoints (qua Dependency Injection):**
+
+```python
+from fastapi import APIRouter, Depends
+from app.services.employee_service import EmployeeService
+from app.core.dependencies import get_employee_service
+
+router = APIRouter()
+
+@router.get("/employees/{id}")
+async def get_employee(
+    id: int,
+    service: EmployeeService = Depends(get_employee_service)
+):
+    # Service tu dong nhan repositories qua DI
+    employee = await service.get_employee(id)
+    return employee
+```
+
+**3. Tao Repository moi cho Entity khac:**
+
+```python
+from app.repositories.base import BaseRepository
+from app.models.department import Department
+
+class DepartmentRepository(BaseRepository[Department]):
+    """Repository cho Department entity."""
+
+    def __init__(self, db: AsyncSession):
+        super().__init__(Department, db)
+
+    # Them methods dac thu cho Department
+    async def find_by_name(self, name: str):
+        return await self.find_one(Department.name == name)
+```
+
+### Loi ich cua Repository Pattern
+
+✅ **Separation of Concerns**: Service chi chua business logic
+✅ **Testability**: De dang mock repositories cho unit tests
+✅ **Maintainability**: Doi database khong anh huong business logic
+✅ **Code Reusability**: BaseRepository giam code lap lai
+✅ **SOLID Principles**: Tuan thu SRP, DIP, OCP
+
+### Vi du Query phuc tap
+
+**Truoc khi co Repository (BAD):**
+```python
+# Service truc tiep viet SQL - Sai!
+class EmployeeService:
+    async def search_employees(self, org_id):
+        result = await self.db.execute(
+            select(Employee).where(Employee.organization_id == org_id)
+        )
+        return result.scalars().all()
+```
+
+**Sau khi co Repository (GOOD):**
+```python
+# Service chi goi repository method - Dung!
+class EmployeeService:
+    async def search_employees(self, org_id):
+        return await self.employee_repo.find_by_organization(org_id, {})
+```

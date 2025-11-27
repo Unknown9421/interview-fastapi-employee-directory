@@ -27,6 +27,59 @@ A high-performance, containerized microservice built with **FastAPI** to provide
 
 ---
 
+## 🏗 Architecture Overview
+
+This project follows **3-Layer Architecture** with **Repository Pattern** for clean separation of concerns:
+
+```
+┌─────────────────────────────────────┐
+│   Presentation Layer (API/Router)   │  ← app/api/
+│   - REST API endpoints              │
+│   - Request/Response handling       │
+│   - Input validation (Pydantic)     │
+└──────────────┬──────────────────────┘
+               │ Depends(get_employee_service)
+               ↓
+┌─────────────────────────────────────┐
+│     Service Layer (Business)        │  ← app/services/
+│   - Business logic only             │
+│   - Orchestration (call repos)      │
+│   - Data transformation             │
+└──────────────┬──────────────────────┘
+               │ employee_repo.find_by_organization(...)
+               ↓
+┌─────────────────────────────────────┐
+│   Repository Layer (Data Access)    │  ← app/repositories/
+│   - All database queries            │
+│   - Generic CRUD operations         │
+│   - Entity-specific queries         │
+└──────────────┬──────────────────────┘
+               │ db.execute(select(...))
+               ↓
+┌─────────────────────────────────────┐
+│    Models Layer (ORM Entities)      │  ← app/models/
+│   - SQLAlchemy ORM models           │
+│   - Database schema definitions     │
+└─────────────────────────────────────┘
+```
+
+### Benefits of This Architecture:
+
+✅ **Separation of Concerns** - Each layer has a single, well-defined responsibility
+✅ **Testability** - Easy to mock repositories for unit testing services
+✅ **Maintainability** - Database changes don't affect business logic
+✅ **Reusability** - Generic BaseRepository reduces code duplication
+✅ **SOLID Compliance** - Follows Single Responsibility, Dependency Inversion, Open/Closed principles
+
+### Key Components:
+
+- **BaseRepository** (`app/repositories/base.py`): Generic CRUD operations for any entity
+- **EmployeeRepository** (`app/repositories/employee_repository.py`): Employee-specific queries (search, filters, pagination)
+- **OrganizationRepository** (`app/repositories/organization_repository.py`): Organization-specific queries
+- **EmployeeService** (`app/services/employee_service.py`): Business logic and orchestration (NO database queries)
+
+---
+
 ## 🏗 Architecture Decisions
 
 ### 1. Dynamic Columns (The "Configurable Output" Problem)
